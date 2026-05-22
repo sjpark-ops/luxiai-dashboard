@@ -6,7 +6,7 @@ import sys, os, io
 
 sys.path.insert(0, os.path.dirname(__file__))
 from utils.data import (
-    load_sheet, load_sales, load_ad_report,
+    load_sheet, load_sheet_from_excel, load_sales, load_ad_report,
     load_new_ad_report, build_product_table, build_campaign_table,
     build_detail_by_opt, build_detail_by_camp_opt,
 )
@@ -83,12 +83,14 @@ with st.sidebar:
                 new_b = _drive_bytes("DRIVE_NEW")
                 acc_b = _drive_bytes("DRIVE_ACC")
                 day_b = _drive_bytes("DRIVE_DAY")
+            sheet_b = _drive_bytes("DRIVE_SHEET")
             if ad_b and new_b:
-                st.session_state["ad_bytes"]  = ad_b
-                st.session_state["new_bytes"] = new_b
-                st.session_state["acc_bytes"] = acc_b
-                st.session_state["day_bytes"] = day_b
-                st.session_state["file_key"]  = "drive"
+                st.session_state["ad_bytes"]    = ad_b
+                st.session_state["new_bytes"]   = new_b
+                st.session_state["acc_bytes"]   = acc_b
+                st.session_state["day_bytes"]   = day_b
+                st.session_state["sheet_bytes"] = sheet_b
+                st.session_state["file_key"]    = "drive"
                 st.success("✓ 드라이브 연동 완료")
             else:
                 missing = []
@@ -155,26 +157,12 @@ if "ad_bytes" not in st.session_state:
         st.info("← 왼쪽에서 광고 리포트 2개를 업로드하세요.")
     st.stop()
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_sheet(sheet_url=""):
-    import re, traceback
-    m = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
-    sheet_id = m.group(1) if m else ""
-    if not sheet_id:
-        st.sidebar.warning("시트 URL 없음")
-        return {}, {}, {}, {}
-    try:
-        result = load_sheet(sheet_id)
-        if not result[0]:  # opt_mw 비어있으면
-            st.sidebar.warning(f"시트 로드됐지만 마진 데이터 없음 (sheet_id={sheet_id[:10]}...)")
-        return result
-    except Exception as e:
-        st.sidebar.error(f"시트 오류: {e}")
-        return {}, {}, {}, {}
-
 @st.cache_data(show_spinner="데이터 처리 중...")
-def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None, _sheet_url=""):
-    opt_mw, opt_mr, opt_reg, opt_type = get_sheet(_sheet_url)
+def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None, sheet_bytes=None):
+    if sheet_bytes:
+        opt_mw, opt_mr, opt_reg, opt_type = load_sheet_from_excel(sheet_bytes)
+    else:
+        opt_mw, opt_mr, opt_reg, opt_type = {}, {}, {}, {}
     opt2prod, prod2name, acc_rev, acc_qty, day_rev, day_qty, opt_rev_map, opt_qty_map = \
         load_sales(acc_bytes, day_bytes)
     ad_df    = load_ad_report(io.BytesIO(ad_bytes))
@@ -191,7 +179,7 @@ prod_tbl, camp_tbl, detail_opt, detail_co = process(
     st.session_state["new_bytes"],
     st.session_state.get("acc_bytes"),
     st.session_state.get("day_bytes"),
-    _sheet_url=sheet_url,
+    sheet_bytes=st.session_state.get("sheet_bytes"),
 )
 
 # ═══════════════════════════════════════════════════

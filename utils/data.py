@@ -8,6 +8,40 @@ def num(s):
     ).fillna(0)
 
 BASE_AD = os.path.join(os.path.dirname(__file__), "..", "..", "쿠팡 광고")
+def load_sheet_from_excel(data):
+    """운영시트 xlsx 바이트 → opt_mw, opt_mr, opt_reg, opt_type"""
+    import io as _io
+    opt_mw, opt_mr, opt_reg, opt_type = {}, {}, {}, {}
+    xl = pd.ExcelFile(_io.BytesIO(data))
+
+    hwp = next((s for s in xl.sheet_names if '현황판' in s or '상품관리' in s), None)
+    if hwp:
+        df = xl.parse(hwp, header=3, dtype=str)
+        opt = df.iloc[:, 2].astype(str).str.strip()
+        reg = df.iloc[:, 1].astype(str).str.strip()
+        mw  = num(df.iloc[:, 18])
+        mr  = num(df.iloc[:, 19]) / 100
+        ok  = opt.str.match(r"^\d{6,}$")
+        opt_mw.update(zip(opt[ok], mw[ok]))
+        opt_mr.update(zip(opt[ok], mr[ok]))
+        opt_reg.update(zip(opt[ok], reg[ok]))
+        opt_type.update({o: "그로스" for o in opt[ok]})
+
+    seller = next((s for s in xl.sheet_names if '판매자배송' in s), None)
+    if seller:
+        df = xl.parse(seller, header=3, dtype=str)
+        opt = df.iloc[:, 1].astype(str).str.strip()
+        mw  = num(df.iloc[:, 16])
+        mr  = num(df.iloc[:, 15]) / 100
+        ok  = opt.str.match(r"^\d{6,}$")
+        for o, w, rv in zip(opt[ok], mw[ok], mr[ok]):
+            if o not in opt_mw:
+                opt_mw[o] = w; opt_mr[o] = rv; opt_reg[o] = o
+            opt_type[o] = "판매자배송"
+
+    return opt_mw, opt_mr, opt_reg, opt_type
+
+
 def load_sheet(sheet_id=""):
     import io as _io
     import urllib.request as _ureq
