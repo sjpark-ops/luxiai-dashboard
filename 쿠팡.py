@@ -36,7 +36,8 @@ def _drive_bytes(secret_key):
         if not file_id:
             return None
         import urllib.request as _ureq
-        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+        # xlsx 파일을 Google Sheets export 형식으로 다운로드
+        url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
         req = _ureq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with _ureq.urlopen(req, timeout=30) as r:
             return r.read()
