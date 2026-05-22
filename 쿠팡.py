@@ -84,7 +84,10 @@ with st.sidebar:
                 acc_b   = _drive_bytes("DRIVE_ACC")
                 day_b   = _drive_bytes("DRIVE_DAY")
                 sheet_b = _drive_bytes("DRIVE_SHEET")
+            err = st.session_state.get("_drive_err_DRIVE_SHEET", "no error stored")
             st.caption(f"AD:{bool(ad_b)} NEW:{bool(new_b)} SHEET:{bool(sheet_b)}")
+            if not sheet_b:
+                st.error(f"SHEET 오류: {err}")
             if ad_b and new_b:
                 st.session_state["ad_bytes"]    = ad_b
                 st.session_state["new_bytes"]   = new_b
