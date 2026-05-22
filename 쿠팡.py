@@ -157,10 +157,20 @@ if "ad_bytes" not in st.session_state:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_sheet(sheet_url=""):
-    import re
+    import re, traceback
     m = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
     sheet_id = m.group(1) if m else ""
-    return load_sheet(sheet_id)
+    if not sheet_id:
+        st.sidebar.warning("시트 URL 없음")
+        return {}, {}, {}, {}
+    try:
+        result = load_sheet(sheet_id)
+        if not result[0]:  # opt_mw 비어있으면
+            st.sidebar.warning(f"시트 로드됐지만 마진 데이터 없음 (sheet_id={sheet_id[:10]}...)")
+        return result
+    except Exception as e:
+        st.sidebar.error(f"시트 오류: {e}")
+        return {}, {}, {}, {}
 
 @st.cache_data(show_spinner="데이터 처리 중...")
 def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None, _sheet_url=""):

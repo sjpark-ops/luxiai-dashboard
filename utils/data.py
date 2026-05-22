@@ -24,7 +24,8 @@ def load_sheet(sheet_id=""):
     try:
         if not sheet_id:
             raise ValueError("no sheet_id")
-        df = pd.read_csv(_io.BytesIO(_fetch("795587558")), encoding="utf-8", header=3, dtype=str)
+        raw = _fetch("795587558")
+        df = pd.read_csv(_io.BytesIO(raw), encoding="utf-8", header=3, dtype=str)
         opt = df.iloc[:, 2].astype(str).str.strip()
         reg = df.iloc[:, 1].astype(str).str.strip()
         mw  = num(df.iloc[:, 18])
@@ -34,8 +35,8 @@ def load_sheet(sheet_id=""):
         opt_mr.update(zip(opt[ok], mr[ok]))
         opt_reg.update(zip(opt[ok], reg[ok]))
         opt_type.update({o: "그로스" for o in opt[ok]})
-    except Exception:
-        pass
+    except Exception as e:
+        raise RuntimeError(f"현황판 로드 실패: {e}") from e
 
     # 판매자배송 — iloc[:,1]=옵션ID, [:,15]=현재마진율%, [:,16]=현재마진금
     try:
@@ -52,8 +53,8 @@ def load_sheet(sheet_id=""):
                 opt_mr[o] = rv
                 opt_reg[o] = o
             opt_type[o] = "판매자배송"  # 판매자배송 탭에 있으면 무조건 판매자배송
-    except Exception:
-        pass
+    except Exception as e:
+        raise RuntimeError(f"판매자배송 로드 실패: {e}") from e
 
     # 폴백: 로컬 CSV (개발환경, sheet_id 없을 때)
     if not opt_mw and not sheet_id:
