@@ -74,7 +74,7 @@ with st.sidebar:
         sheet_url = _sheet_url_from_secrets()
         if st.button("🔄 데이터 새로고침", use_container_width=True):
             st.cache_data.clear()
-            for k in ["ad_bytes","new_bytes","acc_bytes","day_bytes","file_key"]:
+            for k in ["ad_bytes","new_bytes","acc_bytes","day_bytes","sheet_bytes","file_key"]:
                 st.session_state.pop(k, None)
             st.rerun()
         if "file_key" not in st.session_state:
@@ -101,7 +101,11 @@ with st.sidebar:
                 if err:
                     st.caption(f"오류: {err}")
         else:
-            st.success("✓ 드라이브 연동됨")
+            sb = st.session_state.get("sheet_bytes")
+            if sb:
+                st.success("✓ 드라이브 연동됨 (마진시트 포함)")
+            else:
+                st.warning("⚠ 마진시트 미로드 — 새로고침 눌러주세요")
     else:
         # 수동 업로드 모드 (개발환경 / Drive 미설정)
         sheet_url = st.text_input(
