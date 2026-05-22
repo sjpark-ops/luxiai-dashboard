@@ -36,12 +36,20 @@ def _drive_bytes(secret_key):
         if not file_id:
             return None
         import urllib.request as _ureq
-        # xlsx 파일을 Google Sheets export 형식으로 다운로드
-        url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+        # xlsx 직접 다운로드 시도
+        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
         req = _ureq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with _ureq.urlopen(req, timeout=30) as r:
-            return r.read()
-    except Exception:
+            data = r.read()
+        # HTML이 반환된 경우(공유 오류) → Sheets export 재시도
+        if data[:4] != b'PK\x03\x04':
+            url2 = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=xlsx"
+            req2 = _ureq.Request(url2, headers={"User-Agent": "Mozilla/5.0"})
+            with _ureq.urlopen(req2, timeout=30) as r2:
+                data = r2.read()
+        return data if data[:4] == b'PK\x03\x04' else None
+    except Exception as e:
+        st.session_state[f"_drive_err_{secret_key}"] = str(e)
         return None
 
 def _sheet_url_from_secrets():
@@ -83,7 +91,13 @@ with st.sidebar:
                 st.session_state["file_key"]  = "drive"
                 st.success("✓ 드라이브 연동 완료")
             else:
-                st.error("드라이브 파일 로드 실패. 관리자에게 문의하세요.")
+                missing = []
+                if not ad_b:  missing.append("매출최적화(DRIVE_AD)")
+                if not new_b: missing.append("신규고객(DRIVE_NEW)")
+                err = st.session_state.get("_drive_err_DRIVE_AD", "")
+                st.error(f"파일 로드 실패: {', '.join(missing)}\n공유 설정을 확인하세요.")
+                if err:
+                    st.caption(f"오류: {err}")
         else:
             st.success("✓ 드라이브 연동됨")
     else:
