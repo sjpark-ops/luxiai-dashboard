@@ -33,6 +33,16 @@ with st.sidebar:
     st.markdown("## 📊 루시아이\n광고 데이터 대시보드")
     st.divider()
 
+    st.markdown("**📋 운영시트 URL** (마진 데이터)")
+    sheet_url = st.text_input(
+        "구글 시트 URL", placeholder="https://docs.google.com/spreadsheets/d/...",
+        key="sheet_url", label_visibility="collapsed"
+    )
+    if sheet_url != st.session_state.get("_prev_sheet_url", ""):
+        st.session_state["_prev_sheet_url"] = sheet_url
+        st.cache_data.clear()
+
+    st.divider()
     st.markdown("**📂 광고 리포트** (필수)")
     ad_file  = st.file_uploader("매출최적화 리포트 (.xlsx)", type=["xlsx"], key="ad")
     new_file = st.file_uploader("신규고객 리포트 (.xlsx)",   type=["xlsx"], key="new")
@@ -77,13 +87,16 @@ if "ad_bytes" not in st.session_state:
     st.info("← 왼쪽에서 광고 리포트 2개를 업로드하세요.")
     st.stop()
 
-@st.cache_data(ttl=300, show_spinner=False)  # 마진 시트 5분 캐시
-def get_sheet():
-    return load_sheet()
+@st.cache_data(ttl=300, show_spinner=False)
+def get_sheet(sheet_url=""):
+    import re
+    m = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', sheet_url)
+    sheet_id = m.group(1) if m else ""
+    return load_sheet(sheet_id)
 
 @st.cache_data(show_spinner="데이터 처리 중...")
 def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None):
-    opt_mw, opt_mr, opt_reg, opt_type = get_sheet()
+    opt_mw, opt_mr, opt_reg, opt_type = get_sheet(sheet_url)
     opt2prod, prod2name, acc_rev, acc_qty, day_rev, day_qty, opt_rev_map, opt_qty_map = \
         load_sales(acc_bytes, day_bytes)
     ad_df    = load_ad_report(io.BytesIO(ad_bytes))

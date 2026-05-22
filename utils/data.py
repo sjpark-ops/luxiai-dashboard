@@ -8,14 +8,12 @@ def num(s):
     ).fillna(0)
 
 BASE_AD = os.path.join(os.path.dirname(__file__), "..", "..", "쿠팡 광고")
-_SHEET_ID = "1I52yrc2yNuRl4sgJBN7dhtV8E6-TBiqp0uz_-S2QuxQ"
-
-def load_sheet():
+def load_sheet(sheet_id=""):
     import io as _io
     import urllib.request as _ureq
 
     def _fetch(gid):
-        url = f"https://docs.google.com/spreadsheets/d/{_SHEET_ID}/export?format=csv&gid={gid}"
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
         req = _ureq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with _ureq.urlopen(req, timeout=15) as r:
             return r.read()
@@ -24,6 +22,8 @@ def load_sheet():
 
     # 로켓그로스: 상품관리(현황판) — iloc[:,1]=등록ID, [:,2]=옵션ID, [:,18]=마진금, [:,19]=마진율
     try:
+        if not sheet_id:
+            raise ValueError("no sheet_id")
         df = pd.read_csv(_io.BytesIO(_fetch("795587558")), encoding="utf-8", header=3, dtype=str)
         opt = df.iloc[:, 2].astype(str).str.strip()
         reg = df.iloc[:, 1].astype(str).str.strip()
@@ -39,6 +39,8 @@ def load_sheet():
 
     # 판매자배송 — iloc[:,1]=옵션ID, [:,15]=현재마진율%, [:,16]=현재마진금
     try:
+        if not sheet_id:
+            raise ValueError("no sheet_id")
         df = pd.read_csv(_io.BytesIO(_fetch("1484224058")), encoding="utf-8", header=3, dtype=str)
         opt = df.iloc[:, 1].astype(str).str.strip()
         mw  = num(df.iloc[:, 16])
@@ -53,8 +55,8 @@ def load_sheet():
     except Exception:
         pass
 
-    # 폴백: 로컬 CSV (네트워크 불가 시) — col1에 판매방식 있음
-    if not opt_mw:
+    # 폴백: 로컬 CSV (개발환경, sheet_id 없을 때)
+    if not opt_mw and not sheet_id:
         path = os.path.join(BASE_AD, "_sheet.csv")
         df = pd.read_csv(path, encoding="utf-8-sig", header=3, dtype=str)
         opt  = df.iloc[:, 3].astype(str).str.strip()
