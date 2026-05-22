@@ -79,11 +79,12 @@ with st.sidebar:
             st.rerun()
         if "file_key" not in st.session_state:
             with st.spinner("구글 드라이브에서 파일 로딩 중..."):
-                ad_b  = _drive_bytes("DRIVE_AD")
-                new_b = _drive_bytes("DRIVE_NEW")
-                acc_b = _drive_bytes("DRIVE_ACC")
-                day_b = _drive_bytes("DRIVE_DAY")
-            sheet_b = _drive_bytes("DRIVE_SHEET")
+                ad_b    = _drive_bytes("DRIVE_AD")
+                new_b   = _drive_bytes("DRIVE_NEW")
+                acc_b   = _drive_bytes("DRIVE_ACC")
+                day_b   = _drive_bytes("DRIVE_DAY")
+                sheet_b = _drive_bytes("DRIVE_SHEET")
+            st.caption(f"AD:{bool(ad_b)} NEW:{bool(new_b)} SHEET:{bool(sheet_b)}")
             if ad_b and new_b:
                 st.session_state["ad_bytes"]    = ad_b
                 st.session_state["new_bytes"]   = new_b
