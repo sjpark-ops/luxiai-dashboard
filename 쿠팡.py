@@ -28,55 +28,105 @@ div[data-testid="metric-container"] {
 </style>
 """, unsafe_allow_html=True)
 
+# ── Drive 자동 로드 헬퍼 ─────────────────────────────
+def _drive_bytes(secret_key):
+    """Streamlit secrets에 Drive 파일ID가 있으면 다운로드, 없으면 None"""
+    try:
+        file_id = st.secrets.get(secret_key, "")
+        if not file_id:
+            return None
+        import urllib.request as _ureq
+        url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm=t"
+        req = _ureq.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with _ureq.urlopen(req, timeout=30) as r:
+            return r.read()
+    except Exception:
+        return None
+
+def _sheet_url_from_secrets():
+    try:
+        return st.secrets.get("SHEET_URL", "")
+    except Exception:
+        return ""
+
+_use_drive = bool(st.secrets.get("DRIVE_AD", "")) if hasattr(st, "secrets") else False
+try:
+    _use_drive = bool(st.secrets.get("DRIVE_AD", ""))
+except Exception:
+    _use_drive = False
+
 # ── 사이드바 ──────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 📊 루시아이\n광고 데이터 대시보드")
     st.divider()
 
-    st.markdown("**📋 운영시트 URL** (마진 데이터)")
-    sheet_url = st.text_input(
-        "구글 시트 URL", placeholder="https://docs.google.com/spreadsheets/d/...",
-        key="sheet_url", label_visibility="collapsed"
-    )
-    if sheet_url != st.session_state.get("_prev_sheet_url", ""):
-        st.session_state["_prev_sheet_url"] = sheet_url
-        st.cache_data.clear()
-
-    st.divider()
-    st.markdown("**📂 광고 리포트** (필수)")
-    ad_file  = st.file_uploader("매출최적화 리포트 (.xlsx)", type=["xlsx"], key="ad")
-    new_file = st.file_uploader("신규고객 리포트 (.xlsx)",   type=["xlsx"], key="new")
-
-    st.markdown("**📦 판매데이터** (Wing 엑셀)")
-    acc_file = st.file_uploader("월 누적 데이터 (.xlsx)", type=["xlsx"], key="acc",
-                                help="Wing → 판매지표 → 기간: 이번달 1일~오늘")
-    day_file = st.file_uploader("전일 데이터 (.xlsx)",   type=["xlsx"], key="day",
-                                help="Wing → 판매지표 → 기간: 어제 하루")
-
-    all_ready = ad_file and new_file
-    if all_ready:
-        badges = "✓ 광고"
-        if acc_file: badges += "  ✓ 누적"
-        if day_file: badges += "  ✓ 전일"
-        st.success(badges)
-        key = "|".join([
-            ad_file.name, new_file.name,
-            acc_file.name if acc_file else "acc_local",
-            day_file.name if day_file else "day_none",
-        ])
-        if st.session_state.get("file_key") != key:
-            st.session_state["ad_bytes"]  = ad_file.read()
-            st.session_state["new_bytes"] = new_file.read()
-            st.session_state["acc_bytes"] = acc_file.read() if acc_file else None
-            st.session_state["day_bytes"] = day_file.read() if day_file else None
-            st.session_state["file_key"]  = key
+    if _use_drive:
+        # Drive 자동 로드 모드
+        sheet_url = _sheet_url_from_secrets()
+        if st.button("🔄 데이터 새로고침", use_container_width=True):
+            st.cache_data.clear()
+            for k in ["ad_bytes","new_bytes","acc_bytes","day_bytes","file_key"]:
+                st.session_state.pop(k, None)
+            st.rerun()
+        if "file_key" not in st.session_state:
+            with st.spinner("구글 드라이브에서 파일 로딩 중..."):
+                ad_b  = _drive_bytes("DRIVE_AD")
+                new_b = _drive_bytes("DRIVE_NEW")
+                acc_b = _drive_bytes("DRIVE_ACC")
+                day_b = _drive_bytes("DRIVE_DAY")
+            if ad_b and new_b:
+                st.session_state["ad_bytes"]  = ad_b
+                st.session_state["new_bytes"] = new_b
+                st.session_state["acc_bytes"] = acc_b
+                st.session_state["day_bytes"] = day_b
+                st.session_state["file_key"]  = "drive"
+                st.success("✓ 드라이브 연동 완료")
+            else:
+                st.error("드라이브 파일 로드 실패. 관리자에게 문의하세요.")
+        else:
+            st.success("✓ 드라이브 연동됨")
     else:
-        missing = []
-        if not ad_file:  missing.append("광고보고서_매출.xlsx")
-        if not new_file: missing.append("신규광고.xlsx")
-        st.info("필수: " + ", ".join(missing))
-    if not acc_file:
-        st.caption("누적 미업로드 시 판매데이터 없이 실행")
+        # 수동 업로드 모드 (개발환경 / Drive 미설정)
+        sheet_url = st.text_input(
+            "📋 운영시트 URL", placeholder="https://docs.google.com/spreadsheets/d/...",
+            key="sheet_url"
+        )
+        if sheet_url != st.session_state.get("_prev_sheet_url", ""):
+            st.session_state["_prev_sheet_url"] = sheet_url
+            st.cache_data.clear()
+
+        st.markdown("**📂 광고 리포트** (필수)")
+        ad_file  = st.file_uploader("매출최적화 리포트 (.xlsx)", type=["xlsx"], key="ad")
+        new_file = st.file_uploader("신규고객 리포트 (.xlsx)",   type=["xlsx"], key="new")
+
+        st.markdown("**📦 판매데이터** (Wing 엑셀)")
+        acc_file = st.file_uploader("월 누적 데이터 (.xlsx)", type=["xlsx"], key="acc",
+                                    help="Wing → 판매지표 → 기간: 이번달 1일~오늘")
+        day_file = st.file_uploader("전일 데이터 (.xlsx)",   type=["xlsx"], key="day",
+                                    help="Wing → 판매지표 → 기간: 어제 하루")
+
+        all_ready = ad_file and new_file
+        if all_ready:
+            badges = "✓ 광고"
+            if acc_file: badges += "  ✓ 누적"
+            if day_file: badges += "  ✓ 전일"
+            st.success(badges)
+            key = "|".join([
+                ad_file.name, new_file.name,
+                acc_file.name if acc_file else "acc_local",
+                day_file.name if day_file else "day_none",
+            ])
+            if st.session_state.get("file_key") != key:
+                st.session_state["ad_bytes"]  = ad_file.read()
+                st.session_state["new_bytes"] = new_file.read()
+                st.session_state["acc_bytes"] = acc_file.read() if acc_file else None
+                st.session_state["day_bytes"] = day_file.read() if day_file else None
+                st.session_state["file_key"]  = key
+        else:
+            missing = []
+            if not ad_file:  missing.append("광고보고서_매출.xlsx")
+            if not new_file: missing.append("신규광고.xlsx")
+            st.info("필수: " + ", ".join(missing))
 
     st.divider()
     page = st.radio("페이지", ["광고 대시보드", "광고현황 (상품별)"], label_visibility="collapsed")
@@ -84,7 +134,10 @@ with st.sidebar:
 # ── 데이터 로드 ───────────────────────────────────────
 if "ad_bytes" not in st.session_state:
     st.title("📊 루시아이 광고 대시보드")
-    st.info("← 왼쪽에서 광고 리포트 2개를 업로드하세요.")
+    if _use_drive:
+        st.info("데이터 로딩 중입니다. 잠시 기다려주세요.")
+    else:
+        st.info("← 왼쪽에서 광고 리포트 2개를 업로드하세요.")
     st.stop()
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -95,8 +148,8 @@ def get_sheet(sheet_url=""):
     return load_sheet(sheet_id)
 
 @st.cache_data(show_spinner="데이터 처리 중...")
-def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None):
-    opt_mw, opt_mr, opt_reg, opt_type = get_sheet(sheet_url)
+def process(ad_bytes, new_bytes, acc_bytes=None, day_bytes=None, _sheet_url=""):
+    opt_mw, opt_mr, opt_reg, opt_type = get_sheet(_sheet_url)
     opt2prod, prod2name, acc_rev, acc_qty, day_rev, day_qty, opt_rev_map, opt_qty_map = \
         load_sales(acc_bytes, day_bytes)
     ad_df    = load_ad_report(io.BytesIO(ad_bytes))
@@ -113,6 +166,7 @@ prod_tbl, camp_tbl, detail_opt, detail_co = process(
     st.session_state["new_bytes"],
     st.session_state.get("acc_bytes"),
     st.session_state.get("day_bytes"),
+    _sheet_url=sheet_url,
 )
 
 # ═══════════════════════════════════════════════════
